@@ -270,7 +270,7 @@ void GroupTopology::Save(ostream &out) const
    out << "\ncommunication_groups\n";
    out << "number_of_groups " << NGroups() << "\n\n";
 
-   out << "# number of entities in each group, followed by group ids in group\n";
+   out << "# number of entities in each group, followed by ranks in group\n";
    for (int group_id = 0; group_id < NGroups(); ++group_id)
    {
       int group_size = GetGroupSize(group_id);
