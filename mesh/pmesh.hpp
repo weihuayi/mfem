@@ -90,6 +90,8 @@ protected:
    // Convert the local 'meshgen' to a global one.
    void ReduceMeshGen();
 
+   virtual void GenerateBoundaryElements() { /* TODO */ }
+
    // Determine sedge_ledge and sface_lface.
    void FinalizeParTopo();
 

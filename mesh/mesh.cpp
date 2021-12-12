@@ -2650,7 +2650,7 @@ void Mesh::FinalizeTopology(bool generate_bdr)
    {
       GetElementToFaceTable();
       GenerateFaces();
-      if (NumOfBdrElements == 0 && generate_bdr)
+      if (ReduceInt(NumOfBdrElements) == 0 && generate_bdr)
       {
          GenerateBoundaryElements();
          GetElementToFaceTable(); // update be_to_face
@@ -2670,7 +2670,7 @@ void Mesh::FinalizeTopology(bool generate_bdr)
       if (Dim == 2)
       {
          GenerateFaces(); // 'Faces' in 2D refers to the edges
-         if (NumOfBdrElements == 0 && generate_bdr)
+         if (ReduceInt(NumOfBdrElements) == 0 && generate_bdr)
          {
             GenerateBoundaryElements();
          }

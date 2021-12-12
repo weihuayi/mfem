@@ -1517,6 +1517,7 @@ ParMesh ParMesh::MakeSimplicial(ParMesh &orig_mesh)
 void ParMesh::Finalize(bool refine, bool fix_orientation)
 {
    const int meshgen_save = meshgen; // Mesh::Finalize() may call SetMeshGen()
+   // 'mesh_geoms' is local, so there's no need to save and restore it.
 
    Mesh::Finalize(refine, fix_orientation);
 
