@@ -498,8 +498,12 @@ void PABilinearFormExtension::MultTranspose(const Vector &x, Vector &y) const
 // Data and methods for element-assembled bilinear forms
 EABilinearFormExtension::EABilinearFormExtension(BilinearForm *form)
    : PABilinearFormExtension(form),
-     factorize_face_terms(form->FESpace()->IsDGSpace())
+     factorize_face_terms(false)
 {
+   if (form->FESpace()->IsDGSpace() && form->FESpace()->Conforming())
+   {
+      factorize_face_terms = true;
+   }
 }
 
 void EABilinearFormExtension::Assemble()
@@ -702,7 +706,7 @@ void EABilinearFormExtension::Mult(const Vector &x, Vector &y) const
 void EABilinearFormExtension::MultTranspose(const Vector &x, Vector &y) const
 {
    // Apply the Element Restriction
-   const bool useRestrict = DeviceCanUseCeed() || !elem_restrict;
+   const bool useRestrict = !DeviceCanUseCeed() && elem_restrict;
    if (!useRestrict)
    {
       y.UseDevice(true); // typically this is a large vector, so store on device
@@ -780,13 +784,13 @@ void EABilinearFormExtension::MultTranspose(const Vector &x, Vector &y) const
             double res = 0.0;
             for (int i = 0; i < NDOFS; i++)
             {
-               res += A_ext(j, i, 0, f)*X(i, 0, f);
+               res += A_ext(j, i, 1, f)*X(i, 0, f);
             }
             Y(j, 1, f) += res;
             res = 0.0;
             for (int i = 0; i < NDOFS; i++)
             {
-               res += A_ext(j, i, 1, f)*X(i, 1, f);
+               res += A_ext(j, i, 0, f)*X(i, 1, f);
             }
             Y(j, 0, f) += res;
          });
