@@ -157,6 +157,7 @@ void DGTraceIntegrator::SetupPA(const FiniteElementSpace &fes, FaceType type)
    quad1D = maps->nqpt;
    pa_data.SetSize(symmDims * nq * nf, Device::GetMemoryType());
    Vector vel;
+
    if (VectorConstantCoefficient *c_u = dynamic_cast<VectorConstantCoefficient*>
                                         (u))
    {
@@ -291,9 +292,21 @@ void DGTraceIntegrator::SetupPA(const FiniteElementSpace &fes, FaceType type)
       }
       MFEM_VERIFY(f_ind==nf, "Incorrect number of faces.");
    }
-   PADGTraceSetup(dim, dofs1D, quad1D, nf, ir->GetWeights(),
-                  geom->detJ, geom->normal, r, vel,
-                  alpha, beta, pa_data);
+
+   if (external_vel)
+   {
+
+      PADGTraceSetup(dim, dofs1D, quad1D, nf, ir->GetWeights(),
+                     geom->detJ, geom->normal, r, *external_vel,
+                     alpha, beta, pa_data);
+   }
+   else
+   {
+
+      PADGTraceSetup(dim, dofs1D, quad1D, nf, ir->GetWeights(),
+                     geom->detJ, geom->normal, r, vel,
+                     alpha, beta, pa_data);
+   }
 }
 
 void DGTraceIntegrator::AssemblePAInteriorFaces(const FiniteElementSpace& fes)
