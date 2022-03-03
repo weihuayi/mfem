@@ -43,9 +43,12 @@ static void PADGTraceSetup2D(const int Q1D,
    auto W = w.Read();
    auto qd = Reshape(op.Write(), Q1D, 2, 2, NF);
 
-   MFEM_FORALL(f, NF, // can be optimized with Q1D thread for NF blocks
+   //MFEM_FORALL(f, NF, // can be optimized with Q1D thread for NF blocks
+   MFEM_FORALL(q_global, NF*Q1D, // can be optimized with Q1D thread for NF blocks
    {
-      for (int q = 0; q < Q1D; ++q)
+     //for (int q = 0; q < Q1D; ++q)
+     const int f = q_global / Q1D;
+     const int q = q_global % Q1D;
       {
          const double r = const_r ? R(0,0) : R(q,f);
          const double v0 = const_v ? V(0,0,0) : V(0,q,f);
@@ -694,6 +697,7 @@ static void PADGTraceApply(const int dim,
          case 0x22: return PADGTraceApply2D<2,2>(NF,B,Bt,op,x,y);
          case 0x33: return PADGTraceApply2D<3,3>(NF,B,Bt,op,x,y);
          case 0x44: return PADGTraceApply2D<4,4>(NF,B,Bt,op,x,y);
+         case 0x46: return PADGTraceApply2D<4,6>(NF,B,Bt,op,x,y);
          case 0x55: return PADGTraceApply2D<5,5>(NF,B,Bt,op,x,y);
          case 0x66: return PADGTraceApply2D<6,6>(NF,B,Bt,op,x,y);
          case 0x77: return PADGTraceApply2D<7,7>(NF,B,Bt,op,x,y);
@@ -1123,6 +1127,7 @@ static void PADGTraceApplyTranspose(const int dim,
          case 0x22: return PADGTraceApplyTranspose2D<2,2>(NF,B,Bt,op,x,y);
          case 0x33: return PADGTraceApplyTranspose2D<3,3>(NF,B,Bt,op,x,y);
          case 0x44: return PADGTraceApplyTranspose2D<4,4>(NF,B,Bt,op,x,y);
+         case 0x46: return PADGTraceApplyTranspose2D<4,6>(NF,B,Bt,op,x,y);
          case 0x55: return PADGTraceApplyTranspose2D<5,5>(NF,B,Bt,op,x,y);
          case 0x66: return PADGTraceApplyTranspose2D<6,6>(NF,B,Bt,op,x,y);
          case 0x77: return PADGTraceApplyTranspose2D<7,7>(NF,B,Bt,op,x,y);
