@@ -690,12 +690,18 @@ static void PADGTraceApply(const int dim,
                            const Vector &x,
                            Vector &y)
 {
+  static bool trace_display = true;
+  if(trace_display){
+    std::cout<<"Trace D1D/Q1D "<<D1D<<" "<<Q1D<<std::endl;
+    trace_display=false;
+  }
    if (dim == 2)
    {
       switch ((D1D << 4 ) | Q1D)
       {
          case 0x22: return PADGTraceApply2D<2,2>(NF,B,Bt,op,x,y);
          case 0x33: return PADGTraceApply2D<3,3>(NF,B,Bt,op,x,y);
+         case 0x34: return PADGTraceApply2D<3,4>(NF,B,Bt,op,x,y);
          case 0x44: return PADGTraceApply2D<4,4>(NF,B,Bt,op,x,y);
          case 0x46: return PADGTraceApply2D<4,6>(NF,B,Bt,op,x,y);
          case 0x55: return PADGTraceApply2D<5,5>(NF,B,Bt,op,x,y);
@@ -1126,6 +1132,7 @@ static void PADGTraceApplyTranspose(const int dim,
       {
          case 0x22: return PADGTraceApplyTranspose2D<2,2>(NF,B,Bt,op,x,y);
          case 0x33: return PADGTraceApplyTranspose2D<3,3>(NF,B,Bt,op,x,y);
+         case 0x34: return PADGTraceApplyTranspose2D<3,4>(NF,B,Bt,op,x,y);
          case 0x44: return PADGTraceApplyTranspose2D<4,4>(NF,B,Bt,op,x,y);
          case 0x46: return PADGTraceApplyTranspose2D<4,6>(NF,B,Bt,op,x,y);
          case 0x55: return PADGTraceApplyTranspose2D<5,5>(NF,B,Bt,op,x,y);
