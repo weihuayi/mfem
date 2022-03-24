@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2022, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -327,6 +327,10 @@ int ElementRestriction::FillI(SparseMatrix &mat) const
          const int i_offset = d_offsets[i_L];
          const int i_next_offset = d_offsets[i_L+1];
          const int i_nbElts = i_next_offset - i_offset;
+         MFEM_ASSERT_KERNEL(
+            i_nbElts <= Max,
+            "The connectivity of this mesh is beyond the max, increase the "
+            "MaxNbNbr variable to comply with your mesh.");
          for (int e_i = 0; e_i < i_nbElts; ++e_i)
          {
             const int i_E = d_indices[i_offset+e_i];
@@ -401,6 +405,10 @@ void ElementRestriction::FillJAndData(const Vector &ea_data,
          const int i_offset = d_offsets[i_L];
          const int i_next_offset = d_offsets[i_L+1];
          const int i_nbElts = i_next_offset - i_offset;
+         MFEM_ASSERT_KERNEL(
+            i_nbElts <= Max,
+            "The connectivity of this mesh is beyond the max, increase the "
+            "MaxNbNbr variable to comply with your mesh.");
          for (int e_i = 0; e_i < i_nbElts; ++e_i)
          {
             const int i_E = d_indices[i_offset+e_i];

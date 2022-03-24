@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2022, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -415,8 +415,8 @@ void BilinearForm::Assemble(int skip_zeros)
       {
          if (domain_integs_marker[k] != NULL)
          {
-            MFEM_VERIFY(mesh->attributes.Size() ==
-                        domain_integs_marker[k]->Size(),
+            MFEM_VERIFY(domain_integs_marker[k]->Size() ==
+                        (mesh->attributes.Size() ? mesh->attributes.Max() : 0),
                         "invalid element marker for domain integrator #"
                         << k << ", counting from zero");
          }
