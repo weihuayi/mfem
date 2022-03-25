@@ -690,11 +690,7 @@ static void PADGTraceApply(const int dim,
                            const Vector &x,
                            Vector &y)
 {
-  static bool trace_display = true;
-  if(trace_display){
-    std::cout<<"Trace D1D/Q1D "<<D1D<<" "<<Q1D<<std::endl;
-    trace_display=false;
-  }
+
    if (dim == 2)
    {
       switch ((D1D << 4 ) | Q1D)

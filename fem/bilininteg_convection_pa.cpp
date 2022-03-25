@@ -1475,12 +1475,6 @@ static void PAConvectionApply(const int dim,
                               const Vector &x,
                               Vector &y)
 {
-  //std::cout<<"PAConv D1D/Q1D "<<D1D<<" "<<Q1D<<std::endl;
-  static bool conv_display = true;
-  if(conv_display){
-    std::cout<<"conv D1D/Q1D "<<D1D<<" "<<Q1D<<std::endl;
-    conv_display=false;
-  }
    if (dim == 2)
    {
       switch ((D1D << 4 ) | Q1D)

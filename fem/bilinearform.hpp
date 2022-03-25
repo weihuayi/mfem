@@ -271,7 +271,6 @@ public:
    void FullMult(const Vector &x, Vector &y) const
    { mat->Mult(x, y); mat_e->AddMult(x, y); }
 
-   //Need for extension... 
    /// Add the matrix vector multiple to a vector:  \f$ y += a M x \f$
    virtual void AddMult(const Vector &x, Vector &y, const double a = 1.0) const
    { mat -> AddMult (x, y, a); }
