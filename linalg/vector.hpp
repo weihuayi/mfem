@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2022, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -63,6 +63,7 @@ protected:
 
    Memory<double> data;
    int size;
+   bool global_seed_set = false;
 
 public:
 
@@ -72,6 +73,9 @@ public:
 
    /// Copy constructor. Allocates a new data array and copies the data.
    Vector(const Vector &);
+
+   /// Move constructor. "Steals" data from its argument.
+   Vector(Vector&& v);
 
    /// @brief Creates vector of size s.
    /// @warning Entries are not initialized to zero!
@@ -279,6 +283,9 @@ public:
        assignment operator. */
    Vector &operator=(const Vector &v);
 
+   /// Move assignment
+   Vector &operator=(Vector&& v);
+
    /// Redefine '=' for vector = constant.
    Vector &operator=(double value);
 
@@ -402,6 +409,8 @@ public:
 
    /// Set random values in the vector.
    void Randomize(int seed = 0);
+   /// Set global seed for random values in sequential calls to Randomize().
+   void SetGlobalSeed(int gseed);
    /// Returns the l2 norm of the vector.
    double Norml2() const;
    /// Returns the l_infinity norm of the vector.
