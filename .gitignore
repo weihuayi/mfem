@@ -240,6 +240,7 @@ miniapps/navier/navier_kovasznay_vs
 miniapps/navier/navier_tgv
 miniapps/navier/navier_shear
 miniapps/navier/navier_3dfoc
+miniapps/navier/navier_turbchan
 miniapps/navier/tgv_out*.txt
 miniapps/navier/*_output
 
@@ -319,9 +320,13 @@ tests/unit/debug_device_tests
 
 # Benchmark binaries
 tests/benchmarks/bench_ceed
+tests/benchmarks/bench_dgmassinv
 tests/benchmarks/bench_tmop
 tests/benchmarks/bench_vector
 tests/benchmarks/bench_virtuals
+tests/benchmarks/plot/*.pdf
+tests/benchmarks/plot/*.tex
+tests/benchmarks/plot/*.csv
 
 # Test script output
 tests/scripts/*.err

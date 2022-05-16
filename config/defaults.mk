@@ -157,6 +157,7 @@ MFEM_USE_UMPIRE        = NO
 MFEM_USE_SIMD          = NO
 MFEM_USE_ADIOS2        = NO
 MFEM_USE_MKL_CPARDISO  = NO
+MFEM_USE_MOONOLITH     = NO
 MFEM_USE_ADFORWARD     = NO
 MFEM_USE_CODIPACK      = NO
 MFEM_USE_BENCHMARK     = NO
@@ -387,6 +388,11 @@ ifeq ($(SLEPC_FOUND),YES)
       $(subst $(CXX_XLINKER),$(XLINKER),$(SLEPC_DEP))
 endif
 
+ifeq ($(MFEM_USE_MOONOLITH),YES)
+  include $(MOONOLITH_DIR)/config/moonolith-config.makefile
+  MOONOLITH_LIB=$(MOONOLITH_LIBRARIES)
+endif
+
 # MPFR library configuration
 MPFR_OPT =
 MPFR_LIB = -lmpfr
@@ -447,7 +453,7 @@ GSLIB_LIB = -L$(GSLIB_DIR)/lib -lgs
 
 # CUDA library configuration
 CUDA_OPT =
-CUDA_LIB = -lcusparse
+CUDA_LIB = -lcusparse -lcusolver -lcublas
 
 # HIP library configuration
 HIP_OPT =
