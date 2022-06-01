@@ -12052,7 +12052,7 @@ void MeshPart::Print(std::ostream &os) const
    else
    {
       os << "\nnodes\n";
-      nodes->Save(out);
+      nodes->Save(os);
    }
 
    os << "\nmfem_serial_mesh_end\n";
