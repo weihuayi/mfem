@@ -602,6 +602,7 @@ void FaceQuadratureInterpolator::Mult(
             // Q1
             case 22: eval_func = &SmemEval3D<1,2,2>; break;
             case 23: eval_func = &SmemEval3D<1,2,3>; break;
+            case 24: eval_func = &SmemEval3D<1,2,4>; break;
             // Q2
             case 33: eval_func = &SmemEval3D<1,3,3>; break;
             case 34: eval_func = &SmemEval3D<1,3,4>; break;
@@ -615,7 +616,7 @@ void FaceQuadratureInterpolator::Mult(
          }
          if (nq1d >= 10 || !eval_func)
          {
-            eval_func = &SmemEval3D<1>;
+            eval_func = &Eval3D<1>;
          }
       }
    }
@@ -653,6 +654,7 @@ void FaceQuadratureInterpolator::Mult(
             // Q1
             case 22: eval_func = &SmemEval3D<3,2,2>; break;
             case 23: eval_func = &SmemEval3D<3,2,3>; break;
+            case 24: eval_func = &SmemEval3D<3,2,4>; break;
             // Q2
             case 33: eval_func = &SmemEval3D<3,3,3>; break;
             case 34: eval_func = &SmemEval3D<3,3,4>; break;
@@ -666,7 +668,7 @@ void FaceQuadratureInterpolator::Mult(
          }
          if (nq1d >= 10 || !eval_func)
          {
-            eval_func = &SmemEval3D<3>;
+            eval_func = &Eval3D<3>;
          }
       }
    }
