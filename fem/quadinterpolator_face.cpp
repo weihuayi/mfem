@@ -15,6 +15,9 @@
 #include "../linalg/dtensor.hpp"
 #include "../linalg/kernels.hpp"
 
+#define MFEM_DEBUG_COLOR 226
+#include "../general/debug.hpp"
+
 namespace mfem
 {
 
@@ -102,6 +105,7 @@ void FaceQuadratureInterpolator::Eval2D(
    Vector &q_nor,
    const int eval_flags)
 {
+   dbg("vdim:%d, D1D:%d, Q1D:%d",T_VDIM,T_ND1D,T_NQ1D);
    const int nd1d = maps.ndof;
    const int nq1d = maps.nqpt;
    const int ND1D = T_ND1D ? T_ND1D : nd1d;
@@ -198,6 +202,7 @@ void FaceQuadratureInterpolator::Eval3D(
    Vector &q_nor,
    const int eval_flags)
 {
+   dbg("vdim:%d, D1D:%d, Q1D:%d",T_VDIM,T_ND1D,T_NQ1D);
    const int nd1d = maps.ndof;
    const int nq1d = maps.nqpt;
    const int ND1D = T_ND1D ? T_ND1D : nd1d;
@@ -366,6 +371,7 @@ void FaceQuadratureInterpolator::SmemEval3D(
    Vector &q_nor,
    const int eval_flags)
 {
+   dbg("vdim:%d, D1D:%d, Q1D:%d",T_VDIM,T_ND1D,T_NQ1D);
    MFEM_PERF_SCOPE("FaceQuadInterpolator::SmemEval3D");
    const int nd1d = maps.ndof;
    const int nq1d = maps.nqpt;
@@ -555,6 +561,7 @@ void FaceQuadratureInterpolator::Mult(
       Vector &q_det,
       Vector &q_nor,
       const int eval_flags) = NULL;
+   dbg("vdim:%d, dim:%d, nd1d:%d, nq1d:%d",vdim,dim,nd1d,nq1d);
    if (vdim == 1)
    {
       if (dim == 2)
