@@ -616,7 +616,7 @@ void FaceQuadratureInterpolator::Mult(
          }
          if (nq1d >= 10 || !eval_func)
          {
-            //eval_func = &Eval3D<1>;
+            eval_func = &Eval3D<1>;
          }
       }
    }
@@ -644,7 +644,7 @@ void FaceQuadratureInterpolator::Mult(
          }
          if (nq1d >= 10 || !eval_func)
          {
-            // eval_func = &Eval2D<2>;
+            eval_func = &Eval2D<2>;
          }
       }
       else if (dim == 3)
@@ -670,7 +670,7 @@ void FaceQuadratureInterpolator::Mult(
          }
          if (nq1d >= 10 || !eval_func)
          {
-            //eval_func = &Eval3D<3>;
+            eval_func = &Eval3D<3>;
          }
       }
    }
