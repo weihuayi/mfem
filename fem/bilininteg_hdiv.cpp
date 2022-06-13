@@ -1075,13 +1075,13 @@ void PAHdivMassApply(const int dim,
    {
       switch (id)
       {
-         /*case 0x23: return SmemPAHdivMassApply3D<2,3>(NE,Bo,Bc,Bot,Bct,op,x,y);
+         case 0x23: return SmemPAHdivMassApply3D<2,3>(NE,Bo,Bc,Bot,Bct,op,x,y);
          case 0x34: return SmemPAHdivMassApply3D<3,4>(NE,Bo,Bc,Bot,Bct,op,x,y);
          case 0x45: return SmemPAHdivMassApply3D<4,5>(NE,Bo,Bc,Bot,Bct,op,x,y);
          case 0x56: return SmemPAHdivMassApply3D<5,6>(NE,Bo,Bc,Bot,Bct,op,x,y);
          case 0x67: return SmemPAHdivMassApply3D<6,7>(NE,Bo,Bc,Bot,Bct,op,x,y);
          case 0x78: return SmemPAHdivMassApply3D<7,8>(NE,Bo,Bc,Bot,Bct,op,x,y);
-   */default: // fallback
+         default: // fallback
             return PAHdivMassApply3D(D1D,Q1D,NE,Bo,Bc,Bot,Bct,op,x,y);
       }
    }
