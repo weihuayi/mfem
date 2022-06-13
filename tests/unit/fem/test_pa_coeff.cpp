@@ -638,7 +638,7 @@ TEST_CASE("Hcurl/Hdiv PA Coefficient",
       }
    }
 }
-/*
+
 TEST_CASE("Hcurl/Hdiv Mixed PA Coefficient",
           "[CUDA][PartialAssembly][Coefficient]")
 {
@@ -876,6 +876,6 @@ TEST_CASE("Hcurl/Hdiv Mixed PA Coefficient",
          delete dcoeff;
       }
    }
-}*/
+}
 
 } // namespace pa_coeff
