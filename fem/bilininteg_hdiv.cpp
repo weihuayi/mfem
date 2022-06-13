@@ -9,8 +9,6 @@
 // terms of the BSD-3 license.  We welcome feedback and contributions, see file
 // CONTRIBUTING.md for details.
 
-#define MFEM_DEBUG_COLOR 87
-#include "../general/debug.hpp"
 #include "../general/forall.hpp"
 #include "bilininteg.hpp"
 #include "gridfunc.hpp"
@@ -239,26 +237,19 @@ void SmemPAHdivMassApply2D(const int NE,
                            const int d1d = 0,
                            const int q1d = 0)
 {
+   MFEM_CONTRACT_VAR(Bot_);
+   MFEM_CONTRACT_VAR(Bct_);
+
    static constexpr int VDIM = 2;
-   static constexpr double EPS = 1e-13;
 
    const int D1D = T_D1D ? T_D1D : d1d;
    const int Q1D = T_Q1D ? T_Q1D : q1d;
 
-   const int Q2 = Q1D*Q1D;
-   const int D2 = D1D*(D1D-1);
-
-   MFEM_CONTRACT_VAR(Bot_);
-   MFEM_CONTRACT_VAR(Bct_);
-
    const auto bo = Reshape(Bo_.Read(), Q1D, D1D-1);
    const auto bc = Reshape(Bc_.Read(), Q1D, D1D);
    const auto D = Reshape(op_.Read(), Q1D, Q1D, 3, NE);
-   const auto x = Reshape(x_.Read(), VDIM*D2, NE);
-   const auto x_m = Reshape(x_.Read(), D1D, D1D-1, VDIM, NE);
-   auto y = Reshape(y_.ReadWrite(), VDIM*D2, NE);
-   auto Y = y_.ReadWrite();
-   //auto y_m = Reshape(y_.ReadWrite(), D1D, D1D-1, VDIM, NE);
+   const auto x = Reshape(x_.Read(), D1D, D1D-1, VDIM, NE);
+   auto y = y_.ReadWrite();
 
    MFEM_FORALL_3D(e, NE, Q1D, Q1D, VDIM,
    {
@@ -271,66 +262,31 @@ void SmemPAHdivMassApply2D(const int NE,
       constexpr int MD1 = T_D1D ? T_D1D : HDIV_MAX_D1D;
       constexpr int MDQ = (MQ1 > MD1) ? MQ1 : MD1;
 
-      MFEM_SHARED double BoBot[MQ1*(MD1-1)];
-      MFEM_SHARED double BoBot_m[MQ1*(MD1-1)];
-      double (*Bo)[MD1-1] = (double (*)[MD1-1]) BoBot;
-      const DeviceMatrix Bo_m(BoBot_m, Q1D, D1D-1);
+      MFEM_SHARED double smo[MQ1*(MD1-1)];
+      const DeviceMatrix Bo(smo, Q1D, D1D-1);
 
-      MFEM_SHARED double BcBct[MQ1*MD1];
-      MFEM_SHARED double BcBct_m[MQ1*MD1];
-      double (*Bc)[MD1] = (double (*)[MD1]) BcBct;
-      const DeviceMatrix Bc_m(BcBct_m, Q1D, D1D);
-
-      double (*Bot)[MQ1] = (double (*)[MQ1]) BoBot;
-      const DeviceMatrix Bot_m(BoBot_m, D1D-1, Q1D);
-      double (*Bct)[MQ1] = (double (*)[MQ1]) BcBct;
-      const DeviceMatrix Bct_m(BcBct_m, D1D, Q1D);
+      MFEM_SHARED double smc[MQ1*MD1];
+      const DeviceMatrix Bc(smc, Q1D, D1D);
 
       MFEM_SHARED double sm0[VDIM*MDQ*MDQ];
-      MFEM_SHARED double sm0_m[VDIM*MDQ*MDQ];
       MFEM_SHARED double sm1[VDIM*MDQ*MDQ];
-      MFEM_SHARED double sm1_m[VDIM*MDQ*MDQ];
-      double *X = sm0;
-      DeviceCube X_m(sm0_m, D1D, D1D-1, VDIM);
-      double *DQ = sm1;
-      DeviceCube DQ_m(sm1_m, Q1D, D1D, VDIM);
-      double *QQ = sm0;
-      DeviceCube QQ_m(sm0_m, Q1D, Q1D, VDIM);
-      double *QD = sm1;
-      DeviceCube QD_m(sm1_m, D1D, Q1D, VDIM);
+      DeviceCube X(sm0, D1D, D1D-1, VDIM);
+      DeviceCube QD(sm1, Q1D, D1D, VDIM);
+      DeviceCube QQ(sm0, Q1D, Q1D, VDIM);
 
-      // Load X into shared memory
+      // Load X, Bo and Bc into shared memory
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
-         MFEM_FOREACH_THREAD(dy,y,D1D-1)
+         MFEM_FOREACH_THREAD(dy,y,D1D)
          {
-            MFEM_FOREACH_THREAD(dx,x,D1D)
+            MFEM_FOREACH_THREAD(qx,x,Q1D)
             {
-               const int i = dx + dy*D1D + vd*D2;
-               assert(fabs(x(i,e)-x_m(dx,dy,vd,e))<EPS);
-               X[i] = x(i,e);
-               X_m(dx,dy,vd) = x_m(dx,dy,vd,e);
-               assert(fabs(X[i]-X_m(dx,dy,vd))<EPS);
-            }
-         }
-      }
-      // Load Bo and Bc into shared memory
-      if (tidz == 0)
-      {
-         MFEM_FOREACH_THREAD(d,y,D1D-1)
-         {
-            MFEM_FOREACH_THREAD(q,x,Q1D)
-            {
-               Bo[q][d] = bo(q,d);
-               Bo_m(q,d) = bo(q,d);
-            }
-         }
-         MFEM_FOREACH_THREAD(d,y,D1D)
-         {
-            MFEM_FOREACH_THREAD(q,x,Q1D)
-            {
-               Bc[q][d] = bc(q,d);
-               Bc_m(q,d) = bc(q,d);
+               if (qx < D1D && dy < (D1D-1)) { X(qx,dy,vd) = x(qx,dy,vd,e); }
+               if (tidz == 0)
+               {
+                  if (dy < (D1D-1)) { Bo(qx,dy) = bo(qx,dy); }
+                  Bc(qx,dy) = bc(qx,dy);
+               }
             }
          }
       }
@@ -340,9 +296,8 @@ void SmemPAHdivMassApply2D(const int NE,
       {
          const int nx = (vd == 0) ? D1D : D1D-1;
          const int ny = (vd == 1) ? D1D : D1D-1;
-         const double *Bx = (vd == 0) ? (double *)Bc : (double *)Bo;
-         const DeviceMatrix &Bx_m = (vd == 0) ? Bc_m : Bo_m;
-         DeviceCube X_m_y(X_m, nx, ny, VDIM);
+         DeviceCube Xxy(X, nx, ny, VDIM);
+         const DeviceMatrix &Bx = (vd == 0) ? Bc : Bo;
          MFEM_FOREACH_THREAD(dy,y,ny)
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
@@ -350,15 +305,9 @@ void SmemPAHdivMassApply2D(const int NE,
                double dq = 0.0;
                for (int dx = 0; dx < nx; ++dx)
                {
-                  assert(fabs(Bx[dx + qx*nx] - Bx_m(qx,dx))<EPS);
-                  //dq += X[dx + dy*nx + vd*D2] * Bx[dx + qx*nx];
-                  assert(fabs(X[dx + dy*nx + vd*D2]-X_m_y(dx,dy,vd))<EPS);
-                  //dq += X[dx + dy*nx + vd*D2] * Bx_m(qx,dx);
-                  dq += X_m_y(dx,dy,vd) * Bx_m(qx,dx);
+                  dq += Xxy(dx,dy,vd) * Bx(qx,dx);
                }
-               DQ[qx + dy*Q1D + vd*Q2] = dq;
-               DQ_m(qx, dy, vd) = dq;
-               assert(fabs(DQ[qx+dy*Q1D+vd*Q2] - DQ_m(qx,dy,vd))<EPS);
+               QD(qx,dy,vd) = dq;
             }
          }
       }
@@ -366,8 +315,7 @@ void SmemPAHdivMassApply2D(const int NE,
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
          const int ny = (vd == 1) ? D1D : D1D-1;
-         const double *By = (vd == 1) ? (double *)Bc : (double *)Bo;
-         const DeviceMatrix &By_m = (vd == 1) ? Bc_m : Bo_m;
+         const DeviceMatrix &By = (vd == 1) ? Bc : Bo;
          MFEM_FOREACH_THREAD(qy,y,Q1D)
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
@@ -375,14 +323,9 @@ void SmemPAHdivMassApply2D(const int NE,
                double qq = 0.0;
                for (int dy = 0; dy < ny; ++dy)
                {
-                  assert(fabs(By[dy + qy*ny] - By_m(qy,dy))<EPS);
-                  assert(fabs(DQ[qx+dy*Q1D+vd*Q2] - DQ_m(qx,dy,vd))<EPS);
-                  //qq += DQ[qx + dy*Q1D + vd*Q2]*By[dy + qy*ny];
-                  qq += DQ_m(qx,dy,vd)*By_m(qy,dy);
+                  qq += QD(qx,dy,vd) * By(qy,dy);
                }
-               QQ[qx + qy*Q1D + vd*Q2] = qq;
-               QQ_m(qx, qy, vd) = qq;
-               assert(fabs(QQ[qx + qy*Q1D + vd*Q2] - QQ_m(qx,qy,vd))<EPS);
+               QQ(qx,qy,vd) = qq;
             }
          }
       }
@@ -394,39 +337,15 @@ void SmemPAHdivMassApply2D(const int NE,
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
             {
-               const double Qx = QQ_m(qx, qy, 0);//QQ[qx + qy*Q1D + 0*Q2];
-               const double Qy = QQ_m(qx, qy, 1);//QQ[qx + qy*Q1D + 1*Q2];
+               const double Qx = QQ(qx,qy,0);
+               const double Qy = QQ(qx,qy,1);
 
                const double D11 = D(qx,qy,0,e);
                const double D12 = D(qx,qy,1,e);
                const double D22 = D(qx,qy,2,e);
 
-               QQ[qx + qy*Q1D + 0*Q2] = D11*Qx + D12*Qy;
-               QQ[qx + qy*Q1D + 1*Q2] = D12*Qx + D22*Qy;
-               QQ_m(qx, qy, 0) = D11*Qx + D12*Qy;
-               QQ_m(qx, qy, 1) = D12*Qx + D22*Qy;
-               assert(fabs(QQ[qx + qy*Q1D + 0*Q2] - QQ_m(qx, qy, 0))<EPS);
-            }
-         }
-      }
-      MFEM_SYNC_THREAD; // TODO: can remove this sync?
-      // Load Bot and Bct into shared memory
-      if (tidz == 0)
-      {
-         MFEM_FOREACH_THREAD(d,y,D1D-1)
-         {
-            MFEM_FOREACH_THREAD(q,x,Q1D)
-            {
-               Bot[d][q] = bo(q,d);
-               Bot_m(d,q) = bo(q,d);
-            }
-         }
-         MFEM_FOREACH_THREAD(d,y,D1D)
-         {
-            MFEM_FOREACH_THREAD(q,x,Q1D)
-            {
-               Bct[d][q] = bc(q,d);
-               Bct_m(d,q) = bc(q,d);
+               QQ(qx,qy,0) = D11*Qx + D12*Qy;
+               QQ(qx,qy,1) = D12*Qx + D22*Qy;
             }
          }
       }
@@ -435,9 +354,7 @@ void SmemPAHdivMassApply2D(const int NE,
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
          const int nx = (vd == 0) ? D1D : D1D-1;
-         const double *Bxt = (vd == 0) ? (double *)Bct : (double *)Bot;
-         const DeviceMatrix &Bxt_m = (vd == 0) ? Bct_m : Bot_m;
-         //DeviceCube QD_m_x(QD_m, nx, Q1D, VDIM);
+         const DeviceMatrix &Bx = (vd == 0) ? Bc : Bo;
          MFEM_FOREACH_THREAD(qy,y,Q1D)
          {
             MFEM_FOREACH_THREAD(dx,x,nx)
@@ -445,14 +362,9 @@ void SmemPAHdivMassApply2D(const int NE,
                double qd = 0.0;
                for (int qx = 0; qx < Q1D; ++qx)
                {
-                  assert(fabs(Bxt[qx + dx*Q1D] - Bxt_m(dx,qx))<EPS);
-                  assert(fabs(QQ[qx + qy*Q1D + vd*Q2] - QQ_m(qx,qy,vd))<EPS);
-                  //qd += QQ[qx + qy*Q1D + vd*Q2]*Bxt[qx + dx*Q1D];
-                  qd += QQ_m(qx,qy,vd) * Bxt_m(dx,qx);
+                  qd += QQ(qx,qy,vd) * Bx(qx,dx);
                }
-               QD[dx + qy*nx + vd*Q2] = qd;
-               QD_m(dx, qy, vd) = qd;
-               assert(fabs(QD[dx + qy*nx + vd*Q2] - QD_m(dx, qy, vd))<EPS);
+               QD(dx,qy,vd) = qd;
             }
          }
       }
@@ -461,9 +373,8 @@ void SmemPAHdivMassApply2D(const int NE,
       {
          const int nx = (vd == 0) ? D1D : D1D-1;
          const int ny = (vd == 1) ? D1D : D1D-1;
-         const double *Byt = (vd == 1) ? (double *)Bct : (double *)Bot;
-         const DeviceMatrix &Byt_m = (vd == 1) ? Bct_m : Bot_m;
-         DeviceTensor<4> y_m_n(Y, nx, ny, VDIM, NE);
+         const DeviceMatrix &By = (vd == 1) ? Bc : Bo;
+         DeviceTensor<4> Yxy(y, nx, ny, VDIM, NE);
          MFEM_FOREACH_THREAD(dy,y,ny)
          {
             MFEM_FOREACH_THREAD(dx,x,nx)
@@ -471,13 +382,9 @@ void SmemPAHdivMassApply2D(const int NE,
                double dd = 0.0;
                for (int qy = 0; qy < Q1D; ++qy)
                {
-                  assert(fabs(Byt[qy + dy*Q1D] - Byt_m(dy,qy))<EPS);
-                  assert(fabs(QD[dx + qy*nx + vd*Q2] - QD_m(dx, qy, vd))<EPS);
-                  //dd += QD[dx + qy*nx + vd*Q2]*Byt[qy + dy*Q1D];
-                  dd += QD_m(dx, qy, vd) * Byt_m(dy,qy);
+                  dd += QD(dx,qy,vd) * By(qy,dy);
                }
-               //y(dx + dy*nx + vd*D2, e) += dd;
-               y_m_n(dx, dy, vd, e) += dd;
+               Yxy(dx,dy,vd,e) += dd;
             }
          }
       }
