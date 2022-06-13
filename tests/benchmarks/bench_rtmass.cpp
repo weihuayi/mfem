@@ -15,9 +15,10 @@
 
 #ifdef MFEM_USE_BENCHMARK
 
-Mesh CreateKershawMesh(int N, double eps)
+Mesh CreateKershawMesh(int dim, int N, double eps)
 {
-   Mesh mesh = Mesh::MakeCartesian3D(N, N, N, Element::HEXAHEDRON);
+   Mesh mesh = dim == 2 ? Mesh::MakeCartesian2D(N, N, Element::QUADRILATERAL) :
+               Mesh::MakeCartesian3D(N, N, N, Element::HEXAHEDRON) ;
    KershawTransformation kt(mesh.Dimension(), eps, eps);
    mesh.Transform(kt);
    return mesh;
@@ -44,7 +45,7 @@ struct RTMassBenchmark
    RTMassBenchmark(int p_, int N_, double eps_) :
       p(p_),
       N(N_),
-      mesh(CreateKershawMesh(N,eps_)),
+      mesh(CreateKershawMesh(dim, N, eps_)),
       fec(p-1, dim), // RT space of index p-1
       fes(&mesh, &fec),
       n(fes.GetTrueVSize()),
