@@ -91,7 +91,7 @@ struct RTMassBenchmark
 };
 
 // The different orders the tests can run
-#define P_ORDERS bm::CreateDenseRange(1,5,1)
+#define P_ORDERS bm::CreateDenseRange(1,6,1)
 // The different sides of the mesh
 #define N_SIDES bm::CreateDenseRange(2,30,2)
 

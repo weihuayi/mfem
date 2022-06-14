@@ -9,10 +9,13 @@
 // terms of the BSD-3 license.  We welcome feedback and contributions, see file
 // CONTRIBUTING.md for details.
 
+#define MFEM_DEBUG_COLOR 87
+#include "../general/debug.hpp"
 #include "../general/forall.hpp"
 #include "bilininteg.hpp"
 #include "gridfunc.hpp"
 
+#include <cstdlib> // getenv
 using namespace std;
 
 
@@ -263,10 +266,10 @@ void SmemPAHdivMassApply2D(const int NE,
       constexpr int MDQ = (MQ1 > MD1) ? MQ1 : MD1;
 
       MFEM_SHARED double smo[MQ1*(MD1-1)];
-      const DeviceMatrix Bo(smo, Q1D, D1D-1);
+      DeviceMatrix Bo(smo, D1D-1, Q1D);
 
       MFEM_SHARED double smc[MQ1*MD1];
-      const DeviceMatrix Bc(smc, Q1D, D1D);
+      DeviceMatrix Bc(smc, D1D, Q1D);
 
       MFEM_SHARED double sm0[VDIM*MDQ*MDQ];
       MFEM_SHARED double sm1[VDIM*MDQ*MDQ];
@@ -284,8 +287,8 @@ void SmemPAHdivMassApply2D(const int NE,
                if (qx < D1D && dy < (D1D-1)) { X(qx,dy,vd) = x(qx,dy,vd,e); }
                if (tidz == 0)
                {
-                  if (dy < (D1D-1)) { Bo(qx,dy) = bo(qx,dy); }
-                  Bc(qx,dy) = bc(qx,dy);
+                  if (dy < (D1D-1)) { Bo(dy,qx) = bo(qx,dy); }
+                  Bc(dy,qx) = bc(qx,dy);
                }
             }
          }
@@ -297,7 +300,7 @@ void SmemPAHdivMassApply2D(const int NE,
          const int nx = (vd == 0) ? D1D : D1D-1;
          const int ny = (vd == 1) ? D1D : D1D-1;
          DeviceCube Xxy(X, nx, ny, VDIM);
-         const DeviceMatrix &Bx = (vd == 0) ? Bc : Bo;
+         DeviceMatrix Bx = (vd == 0) ? Bc : Bo;
          MFEM_FOREACH_THREAD(dy,y,ny)
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
@@ -305,7 +308,7 @@ void SmemPAHdivMassApply2D(const int NE,
                double dq = 0.0;
                for (int dx = 0; dx < nx; ++dx)
                {
-                  dq += Xxy(dx,dy,vd) * Bx(qx,dx);
+                  dq += Xxy(dx,dy,vd) * Bx(dx,qx);
                }
                QD(qx,dy,vd) = dq;
             }
@@ -315,7 +318,7 @@ void SmemPAHdivMassApply2D(const int NE,
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
          const int ny = (vd == 1) ? D1D : D1D-1;
-         const DeviceMatrix &By = (vd == 1) ? Bc : Bo;
+         DeviceMatrix By = (vd == 1) ? Bc : Bo;
          MFEM_FOREACH_THREAD(qy,y,Q1D)
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
@@ -323,7 +326,7 @@ void SmemPAHdivMassApply2D(const int NE,
                double qq = 0.0;
                for (int dy = 0; dy < ny; ++dy)
                {
-                  qq += QD(qx,dy,vd) * By(qy,dy);
+                  qq += QD(qx,dy,vd) * By(dy,qy);
                }
                QQ(qx,qy,vd) = qq;
             }
@@ -354,7 +357,7 @@ void SmemPAHdivMassApply2D(const int NE,
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
          const int nx = (vd == 0) ? D1D : D1D-1;
-         const DeviceMatrix &Bx = (vd == 0) ? Bc : Bo;
+         DeviceMatrix Btx = (vd == 0) ? Bc : Bo;
          MFEM_FOREACH_THREAD(qy,y,Q1D)
          {
             MFEM_FOREACH_THREAD(dx,x,nx)
@@ -362,7 +365,7 @@ void SmemPAHdivMassApply2D(const int NE,
                double qd = 0.0;
                for (int qx = 0; qx < Q1D; ++qx)
                {
-                  qd += QQ(qx,qy,vd) * Bx(qx,dx);
+                  qd += QQ(qx,qy,vd) * Btx(dx,qx);
                }
                QD(dx,qy,vd) = qd;
             }
@@ -373,7 +376,7 @@ void SmemPAHdivMassApply2D(const int NE,
       {
          const int nx = (vd == 0) ? D1D : D1D-1;
          const int ny = (vd == 1) ? D1D : D1D-1;
-         const DeviceMatrix &By = (vd == 1) ? Bc : Bo;
+         DeviceMatrix Bty = (vd == 1) ? Bc : Bo;
          DeviceTensor<4> Yxy(y, nx, ny, VDIM, NE);
          MFEM_FOREACH_THREAD(dy,y,ny)
          {
@@ -382,7 +385,7 @@ void SmemPAHdivMassApply2D(const int NE,
                double dd = 0.0;
                for (int qy = 0; qy < Q1D; ++qy)
                {
-                  dd += QD(dx,qy,vd) * By(qy,dy);
+                  dd += QD(dx,qy,vd) * Bty(dy,qy);
                }
                Yxy(dx,dy,vd,e) += dd;
             }
@@ -742,10 +745,10 @@ void SmemPAHdivMassApply3D(const int NE,
       constexpr int MDQ = (MQ1 > MD1) ? MQ1 : MD1;
 
       MFEM_SHARED double smo[MQ1*(MD1-1)];
-      const DeviceMatrix Bo(smo, Q1D, D1D-1);
+      DeviceMatrix Bo(smo, D1D-1, Q1D);
 
       MFEM_SHARED double smc[MQ1*MD1];
-      const DeviceMatrix Bc(smc, Q1D, D1D);
+      DeviceMatrix Bc(smc, D1D, Q1D);
 
       MFEM_SHARED double sm0[VDIM*MDQ*MDQ*MDQ];
       MFEM_SHARED double sm1[VDIM*MDQ*MDQ*MDQ];
@@ -778,18 +781,19 @@ void SmemPAHdivMassApply3D(const int NE,
          {
             MFEM_FOREACH_THREAD(q,x,Q1D)
             {
-               Bo(q,d) = bo(q,d);
+               Bo(d,q) = bo(q,d);
             }
          }
          MFEM_FOREACH_THREAD(d,y,D1D)
          {
             MFEM_FOREACH_THREAD(q,x,Q1D)
             {
-               Bc(q,d) = bc(q,d);
+               Bc(d,q) = bc(q,d);
             }
          }
       }
       MFEM_SYNC_THREAD;
+
       // Apply B operator
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
@@ -797,7 +801,7 @@ void SmemPAHdivMassApply3D(const int NE,
          const int ny = (vd == 1) ? D1D : D1D-1;
          const int nz = (vd == 2) ? D1D : D1D-1;
          DeviceTensor<4> Xxyz(X, nx, ny, nz, VDIM);
-         const DeviceMatrix &Bx = (vd == 0) ? Bc : Bo;
+         DeviceMatrix Bx = (vd == 0) ? Bc : Bo;
          MFEM_FOREACH_THREAD(dy,y,ny)
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
@@ -811,7 +815,7 @@ void SmemPAHdivMassApply3D(const int NE,
                   MFEM_UNROLL(MD1)
                   for (int dz = 0; dz < nz; ++dz)
                   {
-                     u[dz] += Xxyz(dx,dy,dz,vd) * Bx(qx,dx);
+                     u[dz] += Xxyz(dx,dy,dz,vd) * Bx(dx,qx);
                   }
                }
                MFEM_UNROLL(MD1)
@@ -824,7 +828,7 @@ void SmemPAHdivMassApply3D(const int NE,
       {
          const int ny = (vd == 1) ? D1D : D1D-1;
          const int nz = (vd == 2) ? D1D : D1D-1;
-         const DeviceMatrix &By = (vd == 1) ? Bc : Bo;
+         DeviceMatrix dBy = (vd == 1) ? Bc : Bo;
          MFEM_FOREACH_THREAD(qy,y,Q1D)
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
@@ -838,7 +842,7 @@ void SmemPAHdivMassApply3D(const int NE,
                   MFEM_UNROLL(MD1)
                   for (int dz = 0; dz < nz; ++dz)
                   {
-                     u[dz] += QDD(qx,dy,dz,vd) * By(qy,dy);
+                     u[dz] += QDD(qx,dy,dz,vd) * dBy(dy,qy);
                   }
                }
                MFEM_UNROLL(MD1)
@@ -850,7 +854,7 @@ void SmemPAHdivMassApply3D(const int NE,
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
          const int nz = (vd == 2) ? D1D : D1D-1;
-         const DeviceMatrix &Bz = (vd == 2) ? Bc : Bo;
+         DeviceMatrix dBz = (vd == 2) ? Bc : Bo;
          MFEM_FOREACH_THREAD(qy,y,Q1D)
          {
             MFEM_FOREACH_THREAD(qx,x,Q1D)
@@ -864,7 +868,7 @@ void SmemPAHdivMassApply3D(const int NE,
                   MFEM_UNROLL(MQ1)
                   for (int qz = 0; qz < Q1D; ++qz)
                   {
-                     u[qz] += QQD(qx,qy,dz,vd) * Bz(qz,dz);
+                     u[qz] += QQD(qx,qy,dz,vd) * dBz(dz,qz);
                   }
                }
                MFEM_UNROLL(MQ1)
@@ -884,8 +888,8 @@ void SmemPAHdivMassApply3D(const int NE,
                for (int qz = 0; qz < Q1D; ++qz)
                {
                   const double Qx = QQQ(qx,qy,qz,0);
-                  const double Qy = QQQ(qx,qy,qz,1);
-                  const double Qz = QQQ(qx,qy,qz,2);
+                  const double Qy = QQQ(qx,qy,qz,0);
+                  const double Qz = QQQ(qx,qy,qz,0);
 
                   const double D11 = D(qx,qy,qz,0,e);
                   const double D12 = D(qx,qy,qz,1,e);
@@ -906,7 +910,7 @@ void SmemPAHdivMassApply3D(const int NE,
       MFEM_FOREACH_THREAD(vd,z,VDIM)
       {
          const int nx = (vd == 0) ? D1D : D1D-1;
-         const DeviceMatrix &Bx = (vd == 0) ? Bc : Bo;
+         DeviceMatrix Btx = (vd == 0) ? Bc : Bo;
          MFEM_FOREACH_THREAD(qy,y,Q1D)
          {
             MFEM_FOREACH_THREAD(dx,x,nx)
@@ -920,7 +924,7 @@ void SmemPAHdivMassApply3D(const int NE,
                   MFEM_UNROLL(MQ1)
                   for (int qz = 0; qz < Q1D; ++qz)
                   {
-                     u[qz] += QQQ(qx,qy,qz,vd) * Bx(qx,dx);
+                     u[qz] += QQQ(qx,qy,qz,vd) * Btx(dx,qx);
                   }
                }
                MFEM_UNROLL(MQ1)
@@ -933,7 +937,7 @@ void SmemPAHdivMassApply3D(const int NE,
       {
          const int nx = (vd == 0) ? D1D : D1D-1;
          const int ny = (vd == 1) ? D1D : D1D-1;
-         const DeviceMatrix &By = (vd == 1) ? Bc : Bo;
+         DeviceMatrix Bty = (vd == 1) ? Bc : Bo;
          MFEM_FOREACH_THREAD(dy,y,ny)
          {
             MFEM_FOREACH_THREAD(dx,x,nx)
@@ -947,7 +951,7 @@ void SmemPAHdivMassApply3D(const int NE,
                   MFEM_UNROLL(MQ1)
                   for (int qz = 0; qz < Q1D; ++qz)
                   {
-                     u[qz] += DQQ(dx,qy,qz,vd) * By(qy, dy);
+                     u[qz] += DQQ(dx,qy,qz,vd) * Bty(dy,qy);
                   }
                }
                MFEM_UNROLL(MQ1)
@@ -962,7 +966,7 @@ void SmemPAHdivMassApply3D(const int NE,
          const int ny = (vd == 1) ? D1D : D1D-1;
          const int nz = (vd == 2) ? D1D : D1D-1;
          DeviceTensor<5> Yxyz(y, nx, ny, nz, VDIM, NE);
-         const DeviceMatrix &Bz = (vd == 2) ? Bc : Bo;
+         DeviceMatrix Btz = (vd == 2) ? Bc : Bo;
          MFEM_FOREACH_THREAD(dy,y,ny)
          {
             MFEM_FOREACH_THREAD(dx,x,nx)
@@ -976,7 +980,7 @@ void SmemPAHdivMassApply3D(const int NE,
                   MFEM_UNROLL(MD1)
                   for (int dz = 0; dz < nz; ++dz)
                   {
-                     u[dz] += DDQ(dx,dy,qz,vd) * Bz(qz, dz);
+                     u[dz] += DDQ(dx,dy,qz,vd) * Btz(dz,qz);
                   }
                }
                MFEM_UNROLL(MD1)
@@ -1026,6 +1030,7 @@ void PAHdivMassApply(const int dim,
          case 0x78: return SmemPAHdivMassApply3D<7,8>(NE,Bo,Bc,Bot,Bct,op,x,y);
          default: // fallback
             return PAHdivMassApply3D(D1D,Q1D,NE,Bo,Bc,Bot,Bct,op,x,y);
+
       }
    }
 }
