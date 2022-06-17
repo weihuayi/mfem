@@ -142,10 +142,11 @@ set(SuperLUDist_DIR "${MFEM_DIR}/../SuperLU_DIST_6.3.1" CACHE PATH
 set(SuperLUDist_REQUIRED_PACKAGES "MPI" "BLAS" "ParMETIS" CACHE STRING
     "Additional packages required by SuperLU_DIST.")
 
-set(MUMPS_DIR "${MFEM_DIR}/../MUMPS_5.2.0" CACHE PATH
+set(MUMPS_DIR "${MFEM_DIR}/../MUMPS_5.5.0" CACHE PATH
     "Path to the MUMPS library.")
-# Packages required by MUMPS, depending on how it was compiled.
-set(MUMPS_REQUIRED_PACKAGES "MPI" "BLAS" "METIS" "ScaLAPACK" CACHE STRING
+# MUMPS may also depend on "OpenMP", depending on how it was compiled.
+set(MUMPS_REQUIRED_PACKAGES "MPI" "MPI_Fortran" "LAPACK" "BLAS" "ScaLAPACK"
+    "ParMETIS" "METIS" "Scotch/ptscotch/ptscotcherr/scotch/scotcherr/ptesmumps/ptscotchparmetisv3/esmumps" CACHE STRING
     "Additional packages required by MUMPS.")
 # If the MPI package does not find all required Fortran libraries:
 # set(MUMPS_REQUIRED_LIBRARIES "gfortran" "mpi_mpifh" CACHE STRING
@@ -173,9 +174,12 @@ set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(Threads_LIB_VARS CMAKE_THREAD_LIBS_INIT)
 
 # The ScaLAPACK library, required by STRUMPACK
-set(ScaLAPACK_DIR "${MFEM_DIR}/../scalapack-2.0.2/lib/cmake/scalapack-2.0.2"
-    CACHE PATH "Path to the configuration file scalapack-config.cmake")
-set(ScaLAPACK_TARGET_NAMES scalapack)
+set(ScaLAPACK_DIR "${MFEM_DIR}/../scalapack-2.0.2" CACHE PATH
+    "Path to the ScaLAPACK library.")
+# Alternatively, import ScaLAPACK using config mode:
+# set(ScaLAPACK_DIR "${MFEM_DIR}/../scalapack-2.0.2/lib/cmake/scalapack-2.0.2"
+#     CACHE PATH "Path to the configuration file scalapack-config.cmake")
+# set(ScaLAPACK_TARGET_NAMES scalapack)
 # set(ScaLAPACK_TARGET_FORCE)
 # set(ScaLAPACK_IMPORT_CONFIG DEBUG)
 
