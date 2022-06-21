@@ -155,8 +155,8 @@ set(STRUMPACK_DIR "${MFEM_DIR}/../STRUMPACK-build" CACHE PATH
     "Path to the STRUMPACK library.")
 # STRUMPACK may also depend on "OpenMP", depending on how it was compiled.
 # Starting with v2.2.0 of STRUMPACK, ParMETIS and Scotch are optional.
-set(STRUMPACK_REQUIRED_PACKAGES "MPI" "MPI_Fortran" "ParMETIS" "METIS"
-    "ScaLAPACK" "Scotch/ptscotch/ptscotcherr/scotch/scotcherr" CACHE STRING
+set(STRUMPACK_REQUIRED_PACKAGES "MPI" "MPI_Fortran" "LAPACK" "BLAS" "ScaLAPACK"
+    "ParMETIS" "METIS" "Scotch/ptscotch/ptscotcherr/scotch/scotcherr/ptesmumps/ptscotchparmetisv3/esmumps" CACHE STRING
     "Additional packages required by STRUMPACK.")
 # If the MPI package does not find all required Fortran libraries:
 # set(STRUMPACK_REQUIRED_LIBRARIES "gfortran" "mpi_mpifh" CACHE STRING
@@ -173,9 +173,12 @@ set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(Threads_LIB_VARS CMAKE_THREAD_LIBS_INIT)
 
 # The ScaLAPACK library, required by STRUMPACK
-set(ScaLAPACK_DIR "${MFEM_DIR}/../scalapack-2.0.2/lib/cmake/scalapack-2.0.2"
-    CACHE PATH "Path to the configuration file scalapack-config.cmake")
-set(ScaLAPACK_TARGET_NAMES scalapack)
+set(ScaLAPACK_DIR "${MFEM_DIR}/../scalapack-2.0.2" CACHE PATH
+    "Path to the ScaLAPACK library.")
+# Alternatively, import ScaLAPACK using config mode:
+# set(ScaLAPACK_DIR "${MFEM_DIR}/../scalapack-2.0.2/lib/cmake/scalapack-2.0.2"
+#     CACHE PATH "Path to the configuration file scalapack-config.cmake")
+# set(ScaLAPACK_TARGET_NAMES scalapack)
 # set(ScaLAPACK_TARGET_FORCE)
 # set(ScaLAPACK_IMPORT_CONFIG DEBUG)
 
