@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2022, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -215,7 +215,8 @@ void ComputeQCriterion(ParGridFunction &u, ParGridFunction &q)
 
 int main(int argc, char *argv[])
 {
-   MPI_Session mpi(argc, argv);
+   Mpi::Init(argc, argv);
+   Hypre::Init();
 
    OptionsParser args(argc, argv);
    args.AddOption(&ctx.element_subdivisions, "-es", "--element-subdivisions",
@@ -236,6 +237,7 @@ int main(int argc, char *argv[])
                   "-vis", "--visualization",
                   "-no-vis", "--no-visualization",
                   "Enable or disable GLVis visualization.");
+/*<<<<<<< HEAD
    args.AddOption(&ctx.checkres,
                   "-cr", "--checkresult",
                   "-no-cr", "--no-checkresult",
@@ -247,6 +249,28 @@ int main(int argc, char *argv[])
 
    Device device(ctx.device_config);
    if (mpi.Root()) { device.Print(); }
+   =======*/
+   args.AddOption(
+      &ctx.checkres,
+      "-cr",
+      "--checkresult",
+      "-no-cr",
+      "--no-checkresult",
+      "Enable or disable checking of the result. Returns -1 on failure.");
+   args.Parse();
+   if (!args.Good())
+   {
+      if (Mpi::Root())
+      {
+         args.PrintUsage(mfem::out);
+      }
+      return 1;
+   }
+   if (Mpi::Root())
+   {
+      args.PrintOptions(mfem::out);
+   }
+//>>>>>>> master
 
    Mesh orig_mesh("../../data/periodic-cube.mesh");
    Mesh mesh = Mesh::MakeRefined(orig_mesh, ctx.element_subdivisions,
@@ -258,7 +282,7 @@ int main(int argc, char *argv[])
    *nodes *= M_PI;
 
    int nel = mesh.GetNE();
-   if (mpi.Root())
+   if (Mpi::Root())
    {
       mfem::out << "Number of elements: " << nel << std::endl;
    }
@@ -316,7 +340,7 @@ int main(int argc, char *argv[])
    std::string fname = "tgv_out_p_" + std::to_string(ctx.order) + ".txt";
    FILE *f = NULL;
 
-   if (mpi.Root())
+   if (Mpi::Root())
    {
       int nel1d = std::round(pow(nel, 1.0 / 3.0));
       int ngridpts = p_gf->ParFESpace()->GlobalVSize();
@@ -354,6 +378,7 @@ int main(int argc, char *argv[])
       //    pvdc.Save();
       // }
 
+/*<<<<<<< HEAD
       // u_inf_loc = u_gf->Normlinf();
       // p_inf_loc = p_gf->Normlinf();
       // u_inf = GlobalLpNorm(infinity(), u_inf_loc, MPI_COMM_WORLD);
@@ -366,6 +391,20 @@ int main(int argc, char *argv[])
       //    fflush(f);
       //    fflush(stdout);
       // }
+      =======*/
+      u_inf_loc = u_gf->Normlinf();
+      p_inf_loc = p_gf->Normlinf();
+      u_inf = GlobalLpNorm(infinity(), u_inf_loc, MPI_COMM_WORLD);
+      p_inf = GlobalLpNorm(infinity(), p_inf_loc, MPI_COMM_WORLD);
+      ke = kin_energy.ComputeKineticEnergy(*u_gf);
+      if (Mpi::Root())
+      {
+         printf("%.5E %.5E %.5E %.5E %.5E\n", t, dt, u_inf, p_inf, ke);
+         fprintf(f, "%20.16e     %20.16e\n", t, ke);
+         fflush(f);
+         fflush(stdout);
+      }
+//>>>>>>> master
    }
 
    flowsolver.PrintTimingData();
@@ -378,7 +417,7 @@ int main(int argc, char *argv[])
       ke = kin_energy.ComputeKineticEnergy(*u_gf);
       if (fabs(ke - ke_expected) > tol)
       {
-         if (mpi.Root())
+         if (Mpi::Root())
          {
             mfem::out << "Result has a larger error than expected."
                       << std::endl;

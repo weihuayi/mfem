@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2022, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -49,7 +49,8 @@ void vel(const Vector &x, double t, Vector &u)
 
 int main(int argc, char *argv[])
 {
-   MPI_Session mpi(argc, argv);
+   Mpi::Init(argc, argv);
+   Hypre::Init();
 
    OptionsParser args(argc, argv);
    args.AddOption(&ctx.device_config, "-d", "--device",
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
       mesh->UniformRefinement();
    }
 
-   if (mpi.Root())
+   if (Mpi::Root())
    {
       std::cout << "Number of elements: " << mesh->GetNE() << std::endl;
    }
@@ -130,7 +131,7 @@ int main(int argc, char *argv[])
          pvdc.Save();
       }
 
-      if (mpi.Root())
+      if (Mpi::Root())
       {
          printf("%11s %11s\n", "Time", "dt");
          printf("%.5E %.5E\n", t, dt);

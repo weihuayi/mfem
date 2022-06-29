@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2022, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -121,11 +121,14 @@ void NavierSolver::Setup(double dt)
    const IntegrationRule &ir_face =
       gll_rules.Get(vfes->GetMesh()->GetFaceGeometry(0), 2 * order - 1);
 
+/*<<<<<<< HEAD
    mean_evaluator = new MeanEvaluator(*pfes, ir_ni);
    bdr_nor_evaluator = new BoundaryNormalEvaluator(*vfes, *pfes, ir_face);
    curl_evaluator = new CurlEvaluator(*vfes);
    curl_evaluator->EnablePA(partial_assembly);
 
+=======
+>>>>>>> master*/
    nlcoeff.constant = -1.0;
    N = new ParNonlinearForm(vfes);
    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);

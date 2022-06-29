@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2022, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -8,6 +8,12 @@
 // MFEM is free software; you can redistribute it and/or modify it under the
 // terms of the BSD-3 license. We welcome feedback and contributions, see file
 // CONTRIBUTING.md for details.
+
+// DNS of a channel flow at Re_tau = 180 (variable). A detailed description of
+// the test case can be found at [1]. Like described in the reference, the
+// initial condition is based on the Reichardt function.
+//
+// [1] https://how5.cenaero.be/content/ws2-les-plane-channel-ret550
 
 #include "navier_solver.hpp"
 #include <fstream>
@@ -83,13 +89,11 @@ void vel_wall(const Vector &x, double t, Vector &u)
 
 int main(int argc, char *argv[])
 {
-   MPI_Session mpi(argc, argv);
+   Mpi::Init();
+   Hypre::Init();
 
-   Device("ceed-cpu");
-
-   double delta = 1.0;
    double Lx = 2.0 * M_PI;
-   double Ly = 2.0;
+   double Ly = 1.0;
    double Lz = M_PI;
 
    int N = ctx.order + 1;
@@ -101,9 +105,7 @@ int main(int argc, char *argv[])
    int NY = 2 * std::round(48.0 / N);
    int NZ = NL;
 
-   double C = 1.8;
-
-   Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, 1.0, Lz);
+   Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, Ly, Lz);
 
    for (int i = 0; i < mesh.GetNV(); ++i)
    {
@@ -120,7 +122,7 @@ int main(int argc, char *argv[])
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,
                                            mesh.CreatePeriodicVertexMapping(translations));
 
-   if (mpi.Root())
+   if (Mpi::Root())
    {
       printf("NL=%d NX=%d NY=%d NZ=%d dx+=%f\n", NL, NX, NY, NZ, LC * ctx.Re_tau);
       std::cout << "Number of elements: " << mesh.GetNE() << std::endl;
@@ -192,7 +194,7 @@ int main(int argc, char *argv[])
          dt = 1e-2;
       }
 
-      if (mpi.Root())
+      if (Mpi::Root())
       {
          printf("%11s %11s\n", "Time", "dt");
          printf("%.5E %.5E\n", t, dt);
