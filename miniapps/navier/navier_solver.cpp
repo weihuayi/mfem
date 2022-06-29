@@ -11,6 +11,9 @@
 
 #include "navier_solver.hpp"
 #include "../../general/forall.hpp"
+
+#include "../../general/nvtx.hpp"
+
 #include <fstream>
 #include <iomanip>
 
@@ -27,8 +30,8 @@ void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst)
 }
 
 NavierSolver::NavierSolver(ParMesh *mesh, int order, double kin_vis)
-   : pmesh(mesh), order(order), gll_rules(0, Quadrature1D::GaussLobatto),
-     kin_vis(kin_vis)
+   : pmesh(mesh), order(order), kin_vis(kin_vis),
+     gll_rules(0, Quadrature1D::GaussLobatto)
 {
    vfec = new H1_FECollection(order, pmesh->Dimension());
    pfec = new H1_FECollection(order);
@@ -56,41 +59,32 @@ NavierSolver::NavierSolver(ParMesh *mesh, int order, double kin_vis)
    unm1 = 0.0;
    unm2.SetSize(vfes_truevsize);
    unm2 = 0.0;
-   fn.SetSize(vfes_truevsize);
-   Nun.SetSize(vfes_truevsize);
-   Nun = 0.0;
-   Nunm1.SetSize(vfes_truevsize);
-   Nunm1 = 0.0;
-   Nunm2.SetSize(vfes_truevsize);
-   Nunm2 = 0.0;
+   u_tmp.SetSize(vfes_truevsize);
    Fext.SetSize(vfes_truevsize);
-   FText.SetSize(vfes_truevsize);
-   Lext.SetSize(vfes_truevsize);
-   resu.SetSize(vfes_truevsize);
-
-   tmp1.SetSize(vfes_truevsize);
 
    pn.SetSize(pfes_truevsize);
    pn = 0.0;
    resp.SetSize(pfes_truevsize);
    resp = 0.0;
-   FText_bdr.SetSize(pfes_truevsize);
-   g_bdr.SetSize(pfes_truevsize);
+   p_tmp.SetSize(pfes_truevsize);
 
    un_gf.SetSpace(vfes);
    un_gf = 0.0;
    un_next_gf.SetSpace(vfes);
    un_next_gf = 0.0;
 
-   Lext_gf.SetSpace(vfes);
-   curlu_gf.SetSpace(vfes);
-   curlcurlu_gf.SetSpace(vfes);
-   FText_gf.SetSpace(vfes);
-   resu_gf.SetSpace(vfes);
-
    pn_gf.SetSpace(pfes);
    pn_gf = 0.0;
-   resp_gf.SetSpace(pfes);
+
+   u_tmp.UseDevice(true);
+   un.UseDevice(true);
+   un_next.UseDevice(true);
+   unm1.UseDevice(true);
+   unm2.UseDevice(true);
+   Fext.UseDevice(true);
+   pn.UseDevice(true);
+   resp.UseDevice(true);
+   p_tmp.UseDevice(true);
 
    cur_step = 0;
 
@@ -99,6 +93,8 @@ NavierSolver::NavierSolver(ParMesh *mesh, int order, double kin_vis)
 
 void NavierSolver::Setup(double dt)
 {
+   MFEM_NVTX;
+
    if (verbose && pmesh->GetMyRank() == 0)
    {
       mfem::out << "Setup" << std::endl;
@@ -120,18 +116,22 @@ void NavierSolver::Setup(double dt)
    Array<int> empty;
 
    // GLL integration rule (Numerical Integration)
-   const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(),
-                                                2 * order - 1);
+   const IntegrationRule &ir_ni =
+      gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order - 1);
+   const IntegrationRule &ir_face =
+      gll_rules.Get(vfes->GetMesh()->GetFaceGeometry(0), 2 * order - 1);
 
-   const IntegrationRule &ir = gll_rules.Get(vfes->GetFE(0)->GetGeomType(),
-                                             2 * order - 1);
+   mean_evaluator = new MeanEvaluator(*pfes, ir_ni);
+   bdr_nor_evaluator = new BoundaryNormalEvaluator(*vfes, *pfes, ir_face);
+   curl_evaluator = new CurlEvaluator(*vfes);
+   curl_evaluator->EnablePA(partial_assembly);
 
    nlcoeff.constant = -1.0;
    N = new ParNonlinearForm(vfes);
    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
    if (numerical_integ)
    {
-      nlc_nlfi->SetIntRule(&ir);
+      nlc_nlfi->SetIntRule(&ir_ni);
    }
    N->AddDomainIntegrator(nlc_nlfi);
    if (partial_assembly)
@@ -215,22 +215,13 @@ void NavierSolver::Setup(double dt)
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
 
-   FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
-   FText_bdr_form = new ParLinearForm(pfes);
-   auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
-   if (numerical_integ)
-   {
-      ftext_bnlfi->SetIntRule(&ir_ni);
-   }
-   FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
-
    g_bdr_form = new ParLinearForm(pfes);
    for (auto &vel_dbc : vel_dbcs)
    {
       auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
       if (numerical_integ)
       {
-         gbdr_bnlfi->SetIntRule(&ir_ni);
+         gbdr_bnlfi->SetIntRule(&ir_face);
       }
       g_bdr_form->AddBoundaryIntegrator(gbdr_bnlfi, vel_dbc.attr);
    }
@@ -252,9 +243,8 @@ void NavierSolver::Setup(double dt)
 
    if (partial_assembly)
    {
-      Vector diag_pa(vfes->GetTrueVSize());
-      Mv_form->AssembleDiagonal(diag_pa);
-      MvInvPC = new OperatorJacobiSmoother(diag_pa, empty);
+      Mv_form->AssembleDiagonal(u_tmp);
+      MvInvPC = new OperatorJacobiSmoother(u_tmp, empty);
    }
    else
    {
@@ -302,14 +292,12 @@ void NavierSolver::Setup(double dt)
 
    if (partial_assembly)
    {
-      Vector diag_pa(vfes->GetTrueVSize());
-      H_form->AssembleDiagonal(diag_pa);
-      HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
+      H_form->AssembleDiagonal(u_tmp);
+      HInvPC = new OperatorJacobiSmoother(u_tmp, vel_ess_tdof);
    }
    else
    {
-      HInvPC = new HypreSmoother(*H.As<HypreParMatrix>());
-      dynamic_cast<HypreSmoother *>(HInvPC)->SetType(HypreSmoother::Jacobi, 1);
+      HInvPC = new HypreSmoother(*H.As<HypreParMatrix>(), HypreSmoother::Jacobi);
    }
    HInv = new CGSolver(vfes->GetComm());
    HInv->iterative_mode = true;
@@ -353,16 +341,11 @@ void NavierSolver::UpdateTimestepHistory(double dt)
    dthist[1] = dthist[0];
    dthist[0] = dt;
 
-   // Rotate values in nonlinear extrapolation history
-   Nunm2 = Nunm1;
-   Nunm1 = Nun;
-
    // Rotate values in solution history
    unm2 = unm1;
    unm1 = un;
 
    // Update the current solution and corresponding GridFunction
-   un_next_gf.GetTrueDofs(un_next);
    un = un_next;
    un_gf.SetFromTrueDofs(un);
 }
@@ -370,6 +353,7 @@ void NavierSolver::UpdateTimestepHistory(double dt)
 void NavierSolver::Step(double &time, double dt, int current_step,
                         bool provisional)
 {
+   MFEM_NVTX;
    sw_step.Start();
 
    SetTimeIntegrationCoefficients(current_step);
@@ -379,144 +363,211 @@ void NavierSolver::Step(double &time, double dt, int current_step,
    {
       vel_dbc.coeff->SetTime(time + dt);
    }
-
    // Set current time for pressure Dirichlet boundary conditions.
    for (auto &pres_dbc : pres_dbcs)
    {
       pres_dbc.coeff->SetTime(time + dt);
    }
 
-   H_bdfcoeff.constant = bd0 / dt;
-   H_form->Update();
-   H_form->Assemble();
-   H_form->FormSystemMatrix(vel_ess_tdof, H);
-
-   HInv->SetOperator(*H);
-   if (partial_assembly)
+   if (H_bdfcoeff.constant != bd0 / dt)
    {
-      delete HInvPC;
-      Vector diag_pa(vfes->GetTrueVSize());
-      H_form->AssembleDiagonal(diag_pa);
-      HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
-      HInv->SetPreconditioner(*HInvPC);
+      NVTX("H_form");
+      {
+         H_bdfcoeff.constant = bd0 / dt;
+         H_form->Update();
+         H_form->Assemble();
+         H_form->FormSystemMatrix(vel_ess_tdof, H);
+      }
+      {
+         NVTX("HInv");
+         HInv->SetOperator(*H);
+         if (partial_assembly)
+         {
+            auto *HInvJac = static_cast<OperatorJacobiSmoother*>(HInvPC);
+            H_form->AssembleDiagonal(u_tmp);
+            HInvJac->Setup(u_tmp);
+         }
+      }
    }
 
-   // Extrapolated f^{n+1}.
-   for (auto &accel_term : accel_terms)
    {
-      accel_term.coeff->SetTime(time + dt);
-   }
+      NVTX("f_form");
+      // Set time for forcing function f^{n+1}.
+      for (auto &accel_term : accel_terms)
+      {
+         accel_term.coeff->SetTime(time + dt);
+      }
 
-   f_form->Assemble();
-   f_form->ParallelAssemble(fn);
+      Vector &fn = u_tmp;
+      f_form->Assemble();
+      f_form->ParallelAssemble(fn);
+   }
 
    // Nonlinear extrapolated terms.
-   sw_extrap.Start();
-
-   N->Mult(un, Nun);
-   N->Mult(unm1, Nunm1);
-   N->Mult(unm2, Nunm2);
-
    {
-      const auto d_Nun = Nun.Read();
-      const auto d_Nunm1 = Nunm1.Read();
-      const auto d_Nunm2 = Nunm2.Read();
-      auto d_Fext = Fext.Write();
-      const auto ab1_ = ab1;
-      const auto ab2_ = ab2;
-      const auto ab3_ = ab3;
-      MFEM_FORALL(i, Fext.Size(),
-                  d_Fext[i] = ab1_ * d_Nun[i] +
-                              ab2_ * d_Nunm1[i] +
-                              ab3_ * d_Nunm2[i];);
-   }
+      NVTX("Extrapolation");
+      sw_extrap.Start();
 
-   Fext.Add(1.0, fn);
+      Vector &fn = u_tmp;
+      N->Mult(un, Fext);
+      fn.Add(ab1, Fext);
+      N->Mult(unm1, Fext);
+      fn.Add(ab2, Fext);
+      N->Mult(unm2, Fext);
+      fn.Add(ab3, Fext);
 
-   // Fext = M^{-1} (F(u^{n}) + f^{n+1})
-   MvInv->Mult(Fext, tmp1);
-   iter_mvsolve = MvInv->GetNumIterations();
-   res_mvsolve = MvInv->GetFinalNorm();
-   Fext.Set(1.0, tmp1);
+      // Fext = M^{-1} (F(u^{n}) + f^{n+1})
+      MvInv->Mult(fn, Fext);
+      iter_mvsolve = MvInv->GetNumIterations();
+      res_mvsolve = MvInv->GetFinalNorm();
 
-   // Compute BDF terms.
-   {
-      const double bd1idt = -bd1 / dt;
-      const double bd2idt = -bd2 / dt;
-      const double bd3idt = -bd3 / dt;
-      const auto d_un = un.Read();
-      const auto d_unm1 = unm1.Read();
-      const auto d_unm2 = unm2.Read();
-      auto d_Fext = Fext.ReadWrite();
-      MFEM_FORALL(i, Fext.Size(),
-                  d_Fext[i] += bd1idt * d_un[i] +
-                               bd2idt * d_unm1[i] +
-                               bd3idt * d_unm2[i];);
+      // Compute BDF terms.
+      {
+         const double bd1idt = -bd1 / dt;
+         const double bd2idt = -bd2 / dt;
+         const double bd3idt = -bd3 / dt;
+         const auto d_un = un.Read();
+         const auto d_unm1 = unm1.Read();
+         const auto d_unm2 = unm2.Read();
+         auto d_Fext = Fext.ReadWrite();
+         MFEM_FORALL(i, Fext.Size(),
+                     d_Fext[i] += bd1idt * d_un[i] +
+                                  bd2idt * d_unm1[i] +
+                                  bd3idt * d_unm2[i];);
+      }
    }
 
    sw_extrap.Stop();
 
    // Pressure Poisson.
-   sw_curlcurl.Start();
    {
-      const auto d_un = un.Read();
-      const auto d_unm1 = unm1.Read();
-      const auto d_unm2 = unm2.Read();
-      auto d_Lext = Lext.Write();
-      const auto ab1_ = ab1;
-      const auto ab2_ = ab2;
-      const auto ab3_ = ab3;
-      MFEM_FORALL(i, Lext.Size(),
-                  d_Lext[i] = ab1_ * d_un[i] +
-                              ab2_ * d_unm1[i] +
-                              ab3_ * d_unm2[i];);
+      NVTX("Curl curl");
+
+      sw_curlcurl.Start();
+      {
+         const auto d_un = un.Read();
+         const auto d_unm1 = unm1.Read();
+         const auto d_unm2 = unm2.Read();
+         auto d_u_tmp = u_tmp.Write();
+         const auto ab1_ = kin_vis * ab1;
+         const auto ab2_ = kin_vis * ab2;
+         const auto ab3_ = kin_vis * ab3;
+         MFEM_FORALL(i, u_tmp.Size(),
+                     d_u_tmp[i] = ab1_ * d_un[i] +
+                                  ab2_ * d_unm1[i] +
+                                  ab3_ * d_unm2[i];);
+      }
+
+      // Use un_next as temporary to store curl(curl(u))
+      Vector &curlcurlu = un_next;
+      curl_evaluator->ComputeCurlCurl(u_tmp, curlcurlu);
+
+      sw_curlcurl.Stop();
    }
 
-   Lext_gf.SetFromTrueDofs(Lext);
-   if (pmesh->Dimension() == 2)
    {
-      ComputeCurl2D(Lext_gf, curlu_gf);
-      ComputeCurl2D(curlu_gf, curlcurlu_gf, true);
-   }
-   else
-   {
-      ComputeCurl3D(Lext_gf, curlu_gf);
-      ComputeCurl3D(curlu_gf, curlcurlu_gf);
-   }
+      NVTX("Boundary");
 
-   curlcurlu_gf.GetTrueDofs(Lext);
-   Lext *= kin_vis;
+      // Reuse u_tmp as a temporary
+      Vector &curlcurlu = un_next;
+      Vector &FText = u_tmp;
 
-   sw_curlcurl.Stop();
+      // \tilde{F} = F - \nu CurlCurl(u)
+      subtract(Fext, curlcurlu, FText);
 
-   // \tilde{F} = F - \nu CurlCurl(u)
-   FText.Set(-1.0, Lext);
-   FText.Add(1.0, Fext);
+      // p_r = \nabla \cdot FText
+      D->Mult(FText, resp);
+      resp.Neg();
 
-   // p_r = \nabla \cdot FText
-   D->Mult(FText, resp);
-   resp.Neg();
+      // Add boundary terms.
+      bdr_nor_evaluator->Mult(FText, p_tmp);
+      resp.Add(1.0, p_tmp);
 
-   // Add boundary terms.
-   FText_gf.SetFromTrueDofs(FText);
-   FText_bdr_form->Assemble();
-   FText_bdr_form->ParallelAssemble(FText_bdr);
-
-   g_bdr_form->Assemble();
-   g_bdr_form->ParallelAssemble(g_bdr);
-   resp.Add(1.0, FText_bdr);
-   resp.Add(-bd0 / dt, g_bdr);
-
-   if (pres_dbcs.empty())
-   {
-      Orthogonalize(resp);
+      g_bdr_form->Assemble();
+      g_bdr_form->ParallelAssemble(p_tmp);
+      resp.Add(-bd0 / dt, p_tmp);
    }
 
-   for (auto &pres_dbc : pres_dbcs)
    {
-      pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr);
+      NVTX("Poisson");
+      if (pres_dbcs.empty())
+      {
+         SpInvOrthoPC->Orthogonalize(resp);
+      }
+
+      // TODO: better project bdr coefficient on device?
+      // TODO: do this at true DOF level rather than LDOF?
+      for (auto &pres_dbc : pres_dbcs)
+      {
+         pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr);
+      }
+      pn_gf.GetTrueDofs(pn);
+
+      if (partial_assembly)
+      {
+         auto *SpC = Sp.As<ConstrainedOperator>();
+         SpC->EliminateRHS(pn, resp);
+      }
+      else
+      {
+         Sp_form->EliminateVDofsInRHS(pres_ess_tdof, pn, resp);
+      }
+      sw_spsolve.Start();
+      SpInv->Mult(resp, pn);
+      sw_spsolve.Stop();
+      iter_spsolve = SpInv->GetNumIterations();
+      res_spsolve = SpInv->GetFinalNorm();
+      pn_gf.Distribute(pn);
    }
 
+   {
+      NVTX("Project");
+      // If the boundary conditions on the pressure are pure Neumann remove the
+      // nullspace by removing the mean of the pressure solution. This is also
+      // ensured by the OrthoSolver wrapper for the preconditioner which removes
+      // the nullspace after every application.
+      mean_evaluator->MakeMeanZero(pn);
+
+      // Reuse u_tmp as a temporary
+      Vector &MFext = u_tmp;
+      Mv->Mult(Fext, MFext);
+
+      // Now, done with Fext, reuse it for resu
+      Vector &resu = Fext;
+
+      // Project velocity.
+      G->Mult(pn, resu);
+      // resu = MFext - resu
+      subtract(MFext, resu, resu);
+
+      // TODO: better project bdr coefficient on device?
+      // TODO: do this at true DOF level rather than LDOF?
+      for (auto &vel_dbc : vel_dbcs)
+      {
+         un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+      }
+      un_next_gf.GetTrueDofs(un_next);
+
+      if (partial_assembly)
+      {
+         auto *HC = H.As<ConstrainedOperator>();
+         HC->EliminateRHS(un_next, resu);
+      }
+      else
+      {
+         H_form->EliminateVDofsInRHS(vel_ess_tdof, un_next, resu);
+      }
+      // TODO: for Helmholtz (vector mass and vector diffusion), add templated
+      // kernels with shared memory. Potential for fusion?
+      sw_hsolve.Start();
+      HInv->Mult(resu, un_next);
+      sw_hsolve.Stop();
+      iter_hsolve = HInv->GetNumIterations();
+      res_hsolve = HInv->GetFinalNorm();
+      un_next_gf.SetFromTrueDofs(un_next);
+   }
+
+/* HEAD
    pfes->GetRestrictionOperator()->MultTranspose(resp, resp_gf);
 
    Vector X1, B1;
@@ -581,6 +632,7 @@ void NavierSolver::Step(double &time, double dt, int current_step,
 
    un_next_gf.GetTrueDofs(un_next);
 
+>>>>>>> 77a697726329210977e2dcd0c357f628cc4bc0d6 */
    // If the current time step is not provisional, accept the computed solution
    // and update the time step history by default.
    if (!provisional)
@@ -631,8 +683,9 @@ void NavierSolver::Step(double &time, double dt, int current_step,
    }
 }
 
-void NavierSolver::MeanZero(ParGridFunction &v)
+void NavierSolver::ComputeCurl(ParGridFunction &u, ParGridFunction &cu) const
 {
+/*<<<<<<< HEAD
    // Make sure not to recompute the inner product linear form every
    // application.
    if (mass_lf == nullptr)
@@ -891,6 +944,9 @@ void NavierSolver::ComputeCurl2D(ParGridFunction &u,
          cu(i) /= nz;
       }
    }
+=======
+   curl_evaluator->ComputeCurl(u, cu);
+   >>>>>>> 77a697726329210977e2dcd0c357f628cc4bc0d6*/
 }
 
 double NavierSolver::ComputeCFL(ParGridFunction &u, double dt)
@@ -1166,12 +1222,20 @@ void NavierSolver::PrintInfo()
    }
 }
 
+void NavierSolver::MeanZero(ParGridFunction &v)
+{
+   Vector tvec;
+   v.GetTrueDofs(tvec);
+   mean_evaluator->MakeMeanZero(tvec);
+   v.Distribute(tvec);
+}
+
 NavierSolver::~NavierSolver()
 {
-   delete FText_gfcoeff;
+   delete bdr_nor_evaluator;
+   delete curl_evaluator;
+   delete mean_evaluator;
    delete g_bdr_form;
-   delete FText_bdr_form;
-   delete mass_lf;
    delete Mv_form;
    delete N;
    delete Sp_form;

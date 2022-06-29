@@ -16,6 +16,9 @@
 
 #include "mfem.hpp"
 #include "ortho_solver.hpp"
+#include "compute_curl.hpp"
+#include "compute_bdr_normal.hpp"
+#include "compute_mean.hpp"
 
 namespace mfem
 {
@@ -240,20 +243,8 @@ public:
 
    ~NavierSolver();
 
-   /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^2\f$.
-   void ComputeCurl2D(ParGridFunction &u,
-                      ParGridFunction &cu,
-                      bool assume_scalar = false);
-
-   /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
-   void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu);
-
-   /// Remove mean from a Vector.
-   /**
-    * Modify the Vector @a v by subtracting its mean using
-    * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
-    */
-   void Orthogonalize(Vector &v);
+   /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^d\f$.
+   void ComputeCurl(ParGridFunction &u, ParGridFunction &cu) const;
 
    /// Remove the mean from a ParGridFunction.
    /**
@@ -298,16 +289,6 @@ protected:
     */
    void SetTimeIntegrationCoefficients(int step);
 
-   /// Eliminate essential BCs in an Operator and apply to RHS.
-   void EliminateRHS(Operator &A,
-                     ConstrainedOperator &constrainedA,
-                     const Array<int> &ess_tdof_list,
-                     Vector &x,
-                     Vector &b,
-                     Vector &X,
-                     Vector &B,
-                     int copy_interior = 0);
-
    /// Enable/disable debug output.
    bool debug = false;
 
@@ -329,6 +310,7 @@ protected:
    /// Kinematic viscosity (dimensionless).
    double kin_vis;
 
+   /// Gauss-Lobatto integration rules for numerical integration.
    IntegrationRules gll_rules;
 
    /// Velocity \f$H^1\f$ finite element collection.
@@ -343,30 +325,34 @@ protected:
    /// Pressure \f$H^1\f$ finite element space.
    ParFiniteElementSpace *pfes = nullptr;
 
+   /// Nonlinear term
    ParNonlinearForm *N = nullptr;
 
+   /// Vector mass
    ParBilinearForm *Mv_form = nullptr;
 
+   /// Pressure Poisson
    ParBilinearForm *Sp_form = nullptr;
 
+   /// Divergence
    ParMixedBilinearForm *D_form = nullptr;
 
+   /// Gradient
    ParMixedBilinearForm *G_form = nullptr;
 
+   /// Helmholtz
    ParBilinearForm *H_form = nullptr;
 
-   VectorGridFunctionCoefficient *FText_gfcoeff = nullptr;
+   // Helpers for device evaluation
+   BoundaryNormalEvaluator *bdr_nor_evaluator = nullptr;
+   CurlEvaluator *curl_evaluator = nullptr;
+   MeanEvaluator *mean_evaluator = nullptr;
 
-   ParLinearForm *FText_bdr_form = nullptr;
-
+   /// Forcing term
    ParLinearForm *f_form = nullptr;
 
+   // TODO: this form on device
    ParLinearForm *g_bdr_form = nullptr;
-
-   /// Linear form to compute the mass matrix in various subroutines.
-   ParLinearForm *mass_lf = nullptr;
-   ConstantCoefficient onecoeff;
-   double volume = 0.0;
 
    ConstantCoefficient nlcoeff;
    ConstantCoefficient Sp_coeff;
@@ -389,16 +375,16 @@ protected:
    Solver *HInvPC = nullptr;
    CGSolver *HInv = nullptr;
 
-   Vector fn, un, un_next, unm1, unm2, Nun, Nunm1, Nunm2, Fext, FText, Lext,
-          resu;
-   Vector tmp1;
+   // Velocity history
+   Vector un, un_next, unm1, unm2;
+   // Velocity-sized intermediate vectors
+   Vector u_tmp, Fext;
+   // Pressure-sized vectors
+   Vector pn, resp, p_tmp;
 
-   Vector pn, resp, FText_bdr, g_bdr;
+   ParGridFunction un_gf, un_next_gf;
 
-   ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf, Lext_gf, FText_gf,
-                   resu_gf;
-
-   ParGridFunction pn_gf, resp_gf;
+   ParGridFunction pn_gf;
 
    // All essential attributes.
    Array<int> vel_ess_attr;
