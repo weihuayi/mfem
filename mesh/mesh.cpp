@@ -3827,6 +3827,49 @@ Mesh::Mesh(double *vertices_, int num_vertices,
    FinalizeTopology();
 }
 
+void Mesh::set_mesh_data(double *vertices_, int num_vertices,
+           int *element_indices, Geometry::Type element_type,
+           int *element_attributes, int num_elements,
+           int *boundary_indices, Geometry::Type boundary_type,
+           int *boundary_attributes, int num_boundary_elements,
+           int dimension, int space_dimension)
+{
+   if (space_dimension == -1)
+   {
+      space_dimension = dimension;
+   }
+
+   InitMesh(dimension, space_dimension, /*num_vertices*/ 0, num_elements,
+            num_boundary_elements);
+
+   int element_index_stride = Geometry::NumVerts[element_type];
+   int boundary_index_stride = num_boundary_elements > 0 ?
+                               Geometry::NumVerts[boundary_type] : 0;
+
+   // assuming Vertex is POD
+   vertices.MakeRef(reinterpret_cast<Vertex*>(vertices_), num_vertices);
+   NumOfVertices = num_vertices;
+
+   for (int i = 0; i < num_elements; i++)
+   {
+      elements[i] = NewElement(element_type);
+      elements[i]->SetVertices(element_indices + i * element_index_stride);
+      elements[i]->SetAttribute(element_attributes[i]);
+   }
+   NumOfElements = num_elements;
+
+   for (int i = 0; i < num_boundary_elements; i++)
+   {
+      boundary[i] = NewElement(boundary_type);
+      boundary[i]->SetVertices(boundary_indices + i * boundary_index_stride);
+      boundary[i]->SetAttribute(boundary_attributes[i]);
+   }
+   NumOfBdrElements = num_boundary_elements;
+
+   FinalizeTopology();
+}
+
+
 Element *Mesh::NewElement(int geom)
 {
    switch (geom)

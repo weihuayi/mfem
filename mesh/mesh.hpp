@@ -705,6 +705,12 @@ public:
        These methods are intended to be used with the @ref mfem_Mesh_init_ctor
        "init constructor". */
    ///@{
+   void set_mesh_data(double *vertices, int num_vertices,
+        int *element_indices, Geometry::Type element_type,
+        int *element_attributes, int num_elements,
+        int *boundary_indices, Geometry::Type boundary_type,
+        int *boundary_attributes, int num_boundary_elements,
+        int dimension, int space_dimension = -1);
 
    Element *NewElement(int geom);
 
