@@ -3847,7 +3847,16 @@ void Mesh::set_mesh_data(double *vertices_, int num_vertices,
                                Geometry::NumVerts[boundary_type] : 0;
 
    // assuming Vertex is POD
-   vertices.MakeRef(reinterpret_cast<Vertex*>(vertices_), num_vertices);
+   //vertices.MakeRef(reinterpret_cast<Vertex*>(vertices_), num_vertices);
+
+   vertices.SetSize(num_vertices);
+   for(auto i = 0; i < num_vertices; i++)
+   {
+     vertices[i](0) = vertices_[3*i    ];
+     vertices[i](1) = vertices_[3*i + 1];
+     vertices[i](2) = vertices_[3*i + 2];
+   }
+
    NumOfVertices = num_vertices;
 
    for (int i = 0; i < num_elements; i++)
