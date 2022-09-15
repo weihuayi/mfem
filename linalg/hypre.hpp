@@ -658,6 +658,12 @@ public:
 
    virtual MemoryClass GetMemoryClass() const { return GetHypreMemoryClass(); }
 
+   /// Ensure the action of the transpose is performed fast.
+   /** When HYPRE is built for GPUs, this method will construct and store the
+       transposes of the 'diag' and 'offd' CSR matrices. When HYPRE is not built
+       for GPUs, this method is a no-op. */
+   void EnsureMultTranspose() const;
+
    /// Computes y = alpha * A * x + beta * y
    HYPRE_Int Mult(HypreParVector &x, HypreParVector &y,
                   double alpha = 1.0, double beta = 0.0) const;
@@ -1659,7 +1665,7 @@ HypreParMatrix* DiscreteCurl(ParFiniteElementSpace *face_fespace,
 class HypreAMS : public HypreSolver
 {
 private:
-   /// Constuct AMS solver from finite element space
+   /// Construct AMS solver from finite element space
    void Init(ParFiniteElementSpace *edge_space);
 
    /// Create the hypre solver object and set the default options, given the
@@ -1719,7 +1725,7 @@ public:
 class HypreADS : public HypreSolver
 {
 private:
-   /// Constuct ADS solver from finite element space
+   /// Construct ADS solver from finite element space
    void Init(ParFiniteElementSpace *face_fespace);
 
    /// Create the hypre solver object and set the default options, given the

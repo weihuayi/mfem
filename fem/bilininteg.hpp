@@ -2174,6 +2174,7 @@ public:
 /** Class for local mass matrix assembling a(u,v) := (Q u, v) */
 class MassIntegrator: public BilinearFormIntegrator
 {
+   friend class DGMassInverse;
 protected:
 #ifndef MFEM_THREAD_SAFE
    Vector shape, te_shape;
@@ -2423,7 +2424,6 @@ private:
    const DofToQuad *mapsO;         ///< Not owned. DOF-to-quad map, open.
    const DofToQuad *L2mapsO;       ///< Not owned. DOF-to-quad map, open.
    const DofToQuad *mapsC;         ///< Not owned. DOF-to-quad map, closed.
-   const GeometricFactors *geom;   ///< Not owned.
    int dim, ne, dofs1D, L2dofs1D, quad1D;
 
 public:
